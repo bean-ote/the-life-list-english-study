@@ -1,0 +1,44 @@
+name: Capture study pages
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/capture-pages.yml
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install playwright
+      - run: npx playwright install --with-deps chromium
+      - name: Capture Section 1 pages
+        run: |
+          mkdir -p captures
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          (async () => {
+            const browser = await chromium.launch({ headless: true });
+            const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+            await page.goto('https://bean-ote.github.io/the-life-list-english-study/sections/section-01.html', { waitUntil: 'networkidle' });
+            const pages = page.locator('.page');
+            for (let i = 0; i < 4; i++) {
+              await pages.nth(i).screenshot({ path: `captures/section-01-page-${i + 1}.png` });
+            }
+            await browser.close();
+          })();
+          NODE
+      - name: Commit captures
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add captures
+          git diff --cached --quiet || git commit -m "Add Section 1 page captures"
+          git push
